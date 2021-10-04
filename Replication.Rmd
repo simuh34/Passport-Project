@@ -1,0 +1,148 @@
+---
+title: "Replication: Two Linear Regression Models"
+author: "Lab C Group 2"
+output: pdf_document
+---
+
+```{r read_data, echo=FALSE, message=FALSE, warning=FALSE}
+knitr::opts_chunk$set(warning = FALSE)
+knitr::opts_chunk$set(fig.height = 4.5, fig.width = 6)
+require(readr)
+require(dplyr)
+require(ggplot2)
+require(tidyr)
+require(stringr)
+require(shape)
+require(knitr)
+require(kableExtra)
+require(WDI)
+require(tidyverse)
+require(magrittr)
+require(rstanarm)
+```
+
+## Figure 1: Log GNI (2018) vs Mobility Score (2019)
+### Read Data
+```{r,warning=FALSE, message=FALSE}
+HPI <- read.csv("D:\\Documents\\R Project\\675\\Project passport\\Replication\\global_ranking_2019.tab", header=T)
+
+GNI <- read.csv("D:\\Documents\\R Project\\675\\Project passport\\Replication\\GNI.csv", header = T)
+```
+
+### Data Cleaning
+```{r,warning=FALSE, message=FALSE, results='hide',fig.show='hide'}
+## deal with HPI
+HPI %<>% rename(score_2019 = access, Passport=country)
+HPI %<>% select(Passport, score_2019)
+HPI$score_2019 <- as.numeric(HPI$score_2019)
+HPI$Passport <- str_trim(HPI$Passport,'right')
+
+## Update county names in GNI
+GNI$country[GNI$country=="Bahamas, The"] <- "Bahamas"
+GNI$country[GNI$country=="Brunei Darussalam"] <- "Brunei"
+GNI$country[GNI$country=="Cabo Verde"] <- "Cape Verde"
+GNI$country[GNI$country=="Congo, Dem. Rep."] <- "Congo (Dem. Rep.)"
+GNI$country[GNI$country=="Congo, Rep."] <- "Congo (Rep.)"
+GNI$country[GNI$country=="Cote d'Ivoire"] <- "Cote d'Ivoire (Ivory Coast)"
+GNI$country[GNI$country=="Egypt, Arab Rep."] <- "Egypt"
+GNI$country[GNI$country=="Eswatini"] <- "eSwatini"
+GNI$country[GNI$country=="Gambia, The"] <- "Gambia"
+GNI$country[GNI$country=="Hong Kong SAR, China"] <- "Hong Kong (SAR China)"
+GNI$country[GNI$country=="Iran, Islamic Rep."] <- "Iran"
+GNI$country[GNI$country=="Kyrgyz Republic"] <- "Kyrgyzstan"
+GNI$country[GNI$country=="Lao PDR"] <- "Laos"
+GNI$country[GNI$country=="Macao SAR, China"] <- "Macao (SAR China)"
+GNI$country[GNI$country=="Micronesia, Fed. Sts."] <- "Micronesia"
+GNI$country[GNI$country=="Korea, Dem. People’s Rep."] <- "North Korea"
+GNI$country[GNI$country=="Slovak Republic"] <- "Slovakia"
+GNI$country[GNI$country=="Korea, Rep."] <- "South Korea"
+GNI$country[GNI$country=="Syrian Arab Republic"] <- "Syria"
+GNI$country[GNI$country=="Timor-Leste"] <- "Timor Leste"
+GNI$country[GNI$country=="Venezuela, RB"] <- "Venezuela"
+GNI$country[GNI$country=="Yemen, Rep."] <- "Yemen"
+
+## merge two datasets
+GNI_HPI <- GNI %>%
+  filter(year == 2018) %>%
+  select(-year) %>%
+  right_join(HPI, by = c('country' = 'Passport')) %>%
+  select(country, gni, score_2019) %>%
+  mutate(gni_log = log(gni))
+
+## remove NA
+GNI_HPI<-na.omit(GNI_HPI)
+```
+
+### Linear Regression
+```{r,warning=FALSE}
+fit1 <- lm(score_2019 ~ gni_log, data = GNI_HPI)
+summary(fit1)
+resid <- resid(fit1)
+plot(fitted(fit1),resid, ylab="Residuals", xlab="log GNI", main="Residual Plot")
+abline(0,0)
+
+```
+
+### Plot
+```{r,fig.height=5, fig.width=5, fig.align='center'}
+plot(GNI_HPI$gni_log, GNI_HPI$score_2019, pch = 16, col = 'gray60',
+     main = 'Log GNI (2018) vs Mobility Score (2019)',
+     ylab = "Mobility Score", xlab = "Log GNI, PPP")
+abline(a = fit1$coef[1], b = fit1$coef[2], col = 'red', lty = 2, lwd = 1.3)
+
+```
+
+## Figure 2: Fragile State Index vs Mobility Score
+### Read data
+```{r}
+# Read the data
+fsi_18 <- read.csv("fsi-2018.csv")
+ms_19 <- read.csv("global_ranking_2019.tab")
+```
+
+### Data Cleaning
+```{r}
+# Update country names
+fsi_18$Country[fsi_18$Country=="Brunei Darussalam"] <- "Brunei"
+fsi_18$Country[fsi_18$Country=="Congo Democratic Republic"] <- "Congo (Dem. Rep.)"
+fsi_18$Country[fsi_18$Country=="Congo Republic"] <- "Congo (Rep.)"
+fsi_18$Country[fsi_18$Country=="Cote d'Ivoire"] <- "Cote d'Ivoire (Ivory Coast)"
+fsi_18$Country[fsi_18$Country=="Guinea Bissau"] <- "Guinea-Bissau	"
+fsi_18$Country[fsi_18$Country=="Israel and West Bank"] <- "Israel"
+fsi_18$Country[fsi_18$Country=="Kyrgyz Republic"] <- "Kyrgyzstan"
+fsi_18$Country[fsi_18$Country=="Lao PDR"] <- "Laos"
+fsi_18$Country[fsi_18$Country=="Russia"] <- "Russian Federation"
+fsi_18$Country[fsi_18$Country=="Timor-Leste"] <- "Timor Leste"
+fsi_18$Country[fsi_18$Country=="Cape Verde"] <- "Cape Verde Islands"
+fsi_18$Country[fsi_18$Country=="Comoros"] <- "Comores Islands"
+fsi_18$Country[fsi_18$Country=="Slovak Republic"] <- "Slovakia"
+fsi_18$Country[fsi_18$Country=="Timor Leste"] <- "Timor-Leste"
+
+
+
+# data cleaning 
+fsi_data <- filter(fsi_18,Year==2018) %>% 
+  select(Country,Year,Total)
+fsi_data$Country <- str_c(fsi_data$Country,' ')
+
+ms_19 <- rename(ms_19,Country=country)
+
+# Merge two dataset
+dat_18 <- merge(fsi_data,ms_19,all=T) 
+```
+
+### Linear regression
+```{r}
+fit_18 <-stan_glm(access~Total,data = dat_18,refresh=0)
+print(fit_18)
+resid <- resid(fit_18)
+plot(fitted(fit_18),resid, ylab="Residuals", xlab="Total", main="Residual Plot")
+abline(0,0)
+```
+
+### Plot
+```{r,fig.height=5, fig.width=5, fig.align='center'}
+plot(dat_18$Total,dat_18$access,pch = 20, col = 'gray60',main = 'Fragile State Index vs Mobility Score',ylab = "Mobility Score(2019)", xlab = "Fragile State Index(2018)")
+abline(coef(fit_18[1]),coef(fit_18[2]), col = 'red', lty = 2, lwd = 1.3)
+```
+
